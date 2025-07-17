@@ -34,3 +34,16 @@ The focus is on applying quantization and pruning techniques to a fine-tuned Dis
 | T4 GPU        | FP32      | 0%     | 91.06%   | 0.007       | 280.0       | Baseline                       |
 | T4 GPU        | 8-bit     | 0%     | 90.71%   | 0.047       | 213.6       | Native support                 |
 | T4 GPU        | 4-bit     | 0%     | 91.17%   | 0.027       | 89.5        | Best overall result            |
+
+## Reproducing the Results
+
+You can run the notebooks directly in Google Colab or in a local environment with the required dependencies.
+
+### Installation
+
+To install required packages locally:
+
+```bash
+pip install -r requirements.txt
+
+Alternatively, you can open the notebooks in Google Colab for GPU support (recommended).
