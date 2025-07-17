@@ -19,3 +19,18 @@ The focus is on applying quantization and pruning techniques to a fine-tuned Dis
   - NVIDIA GTX 1050 Ti (local)
   - NVIDIA T4 GPU (Colab)
 - **Frameworks**: PyTorch, Hugging Face Transformers, Datasets, ONNX (optional), bitsandbytes (attempted)
+
+## Key Findings
+
+| Device        | Precision | Pruned | Accuracy | Latency (s) | Memory (MB) | Notes                          |
+|---------------|-----------|--------|----------|-------------|-------------|--------------------------------|
+| CPU           | FP32      | 0%     | 91.06%   | 0.072       | 1666.8      | Baseline                       |
+| CPU           | 8-bit     | 0%     | 89.68%   | 0.158       | 60.1        | Best CPU config                |
+| CPU           | 8-bit     | 30%    | 90.48%   | 70.55       | 2216.4      | Higher latency/memory          |
+| CPU           | 8-bit     | 40%    | 88.53%   | 63.06       | 2388.0      | Some accuracy loss             |
+| CPU           | 8-bit     | 50%    | 87.16%   | 53.99       | 2563.8      | Costly trade-off               |
+| GTX 1050 Ti   | FP32      | 0%     | 91.06%   | 0.012       | 282.9       | Baseline                       |
+| GTX 1050 Ti   | 8-bit     | 0%     | 90.71%   | 0.205       | 377.3       | Fallback to CPU                |
+| T4 GPU        | FP32      | 0%     | 91.06%   | 0.007       | 280.0       | Baseline                       |
+| T4 GPU        | 8-bit     | 0%     | 90.71%   | 0.047       | 213.6       | Native support                 |
+| T4 GPU        | 4-bit     | 0%     | 91.17%   | 0.027       | 89.5        | Best overall result            |
