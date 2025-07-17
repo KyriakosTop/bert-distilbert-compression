@@ -45,5 +45,6 @@ To install required packages locally:
 
 ```bash
 pip install -r requirements.txt
+```
 
 Alternatively, you can open the notebooks in Google Colab for GPU support (recommended).
