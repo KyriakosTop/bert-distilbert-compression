@@ -19,10 +19,9 @@ Experiments are conducted using the SST-2 sentiment classification task from the
   - [3. CPU Pruning + Quantization](#3-cpu-pruning--quantization)
   - [4. GPU Quantization on GTX 1050 Ti](#4-gpu-quantization-on-gtx-1050-ti)
 - [Key Findings](#key-findings)
-- [Reproducing the Experiments](#how-to-run)
+- [Reproducing the Experiments](#reproducing-the-experiments)
 - [Dependencies](#dependencies)
 - [Acknowledgements](#acknowledgements)
-- [License](#license)
 
 ## Motivation
 
