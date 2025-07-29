@@ -1,13 +1,14 @@
 ## Efficient Compression Techniques for Large Language Models with Limited Compute Resources
 
-This repository presents a systematic study on compressing DistilBERT using 8-bit and 4-bit quantization, as well as pruning, to enable efficient inference on low-resource hardware. The goal is to evaluate the trade-offs between model size, accuracy, latency, and memory consumption when deploying compressed models on CPUs and GPUs with limited compute capacity.
+This repository presents a systematic study of compression techniques—specifically 8-bit and 4-bit quantization and structured pruning—applied to DistilBERT for efficient inference on low-resource hardware. Experiments are performed using the SST-2 sentiment classification task from the GLUE benchmark, and all models are evaluated post-training without further fine-tuning.
 
-Experiments are conducted using the SST-2 sentiment classification task from the GLUE benchmark. We assess full-precision (FP32), 8-bit, and 4-bit inference modes—alongside structured pruning—across multiple hardware configurations, including:
+We assess performance across three primary dimensions: accuracy, latency, and memory usage. Compression techniques are tested individually and in combination on three hardware setups:
 
-- CPU-only inference
-- NVIDIA T4 GPU (Google Colab)
-- Consumer GPU: GTX 1050 Ti
-- CPU inference with pruning and quantization combined
+- **Colab CPU (Intel Xeon @ 2.20GHz)**: Baseline and pruning + quantization experiments
+- **NVIDIA T4 GPU (Colab)**: Full-precision, 8-bit, and 4-bit quantized inference
+- **GTX 1050 Ti (local machine)**: Full-precision and attempted quantized inference
+
+The evaluation focuses on the trade-offs introduced by each compression method. Results are summarized in the table below.
   
 ## Table of Contents
 
