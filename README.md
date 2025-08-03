@@ -1,168 +1,186 @@
-## Efficient Compression Techniques for Large Language Models with Limited Compute Resources
+# Efficient Compression Techniques for Large Language Models on Limited Compute Resources
 
-This repository presents a systematic study of compression techniques—specifically 8-bit and 4-bit quantization and structured pruning—applied to DistilBERT for efficient inference on low-resource hardware. Experiments are performed using the SST-2 sentiment classification task from the GLUE benchmark, and all models are evaluated post-training without further fine-tuning.
+**Why run large language models on limited hardware at all?**  
+Because most developers don't have access to high-end GPUs. Because deploying models to laptops, embedded devices, or free-tier cloud services is increasingly common. And because not every task needs a trillion-parameter model — but everyone still wants fast, accurate results.
 
-We assess performance across three primary dimensions: accuracy, latency, and memory usage. Compression techniques are tested individually and in combination on three hardware setups:
+This project tackles a practical and relevant challenge:  
+**Can transformer-based models like DistilBERT or BERT-base be made efficient enough to run on CPUs or older GPUs — without retraining and without sacrificing too much accuracy?**
 
-- **Colab CPU (Intel Xeon @ 2.20GHz)**: Baseline and pruning + quantization experiments
-- **NVIDIA T4 GPU (Colab)**: Full-precision, 8-bit, and 4-bit quantized inference
-- **GTX 1050 Ti (local machine)**: Full-precision and attempted quantized inference
+To answer this, we apply **8-bit and 4-bit quantization** and **structured pruning** to fine-tuned transformer models and benchmark their performance on the SST-2 sentiment classification task across a range of hardware environments. The goal is simple:  
+**Make these models smaller, faster, and deployable — without compromising usefulness.**
 
-The evaluation focuses on the trade-offs introduced by each compression method. Results are summarized in the table below.
-  
-## Table of Contents
+---
 
-- [Motivation](#motivation)
-- [Methodology](#methodology)
-- [Experiments](#experiments)
-  - [1. CPU Inference (FP32 vs 8-bit)](#1-cpu-inference-fp32-vs-8-bit)
-  - [2. GPU Quantization on T4](#2-gpu-quantization-on-t4)
-  - [3. CPU Pruning + Quantization](#3-cpu-pruning--quantization)
-  - [4. GPU Quantization on GTX 1050 Ti](#4-gpu-quantization-on-gtx-1050-ti)
-- [Key Findings](#key-findings)
-- [Reproducing the Experiments](#reproducing-the-experiments)
-- [Dependencies](#dependencies)
-- [Acknowledgements](#acknowledgements)
+## 📌 Table of Contents
 
-## Motivation
+1. [Motivation](#1-motivation)  
+2. [Methodology](#2-methodology)  
+3. [Experiments and Results](#3-experiments-and-results)  
+   - [3.1 DistilBERT on CPU (n1)](#31-distilbert-on-cpu-n1)  
+   - [3.2 DistilBERT on CPU — Pruned + Quantized (n2)](#32-distilbert-on-cpu--pruned--quantized-n2)  
+   - [3.3 DistilBERT on T4 GPU (n3)](#33-distilbert-on-t4-gpu-n3)  
+   - [3.4 DistilBERT on GTX 1050 Ti (n4)](#34-distilbert-on-gtx-1050-ti-n4)  
+   - [3.5 BERT-base on T4 GPU (n5)](#35-bert-base-on-t4-gpu-n5)  
+   - [3.6 DistilBERT via ONNX Runtime (n6)](#36-distilbert-via-onnx-runtime-n6)  
+4. [Key Insights](#4-key-insights)  
+5. [How to Reproduce](#5-how-to-reproduce)  
+6. [Dependencies](#6-dependencies)  
+7. [References](#7-references)  
+8. [Acknowledgements](#8-acknowledgements)
 
-Large language models (LLMs) have achieved state-of-the-art results in a wide range of natural language processing tasks. However, their computational and memory requirements make them difficult to deploy on everyday hardware such as laptops, older GPUs, or free-tier cloud environments.
+---
 
-This project explores whether aggressive compression techniques—such as 8-bit and 4-bit quantization, as well as structured pruning—can make models like DistilBERT practical to run on limited compute resources. By quantifying trade-offs between efficiency and accuracy, the project aims to provide actionable insights for developers working in constrained environments.
+## 1. Motivation
 
-## Methodology
+Transformer models are powerful — but deploying them on limited hardware remains a challenge. This project explores whether post-training compression techniques can make models like DistilBERT and BERT practical to run on:
 
-The study focuses on the DistilBERT model fine-tuned for the SST-2 sentiment classification task. All experiments use a consistent data pipeline and tokenization process to ensure comparability across models and hardware.
+- Free-tier CPUs (e.g., Google Colab)
+- Consumer GPUs (e.g., GTX 1050 Ti)
+- Older edge or embedded systems
 
-Compression techniques applied:
+We measure how much accuracy, latency, and memory can be traded off using 8-bit/4-bit quantization and structured pruning — without retraining the model.
 
-- **8-bit quantization**: Using PyTorch (CPU) and bitsandbytes (GPU)
-- **4-bit quantization**: Using bitsandbytes (where supported)
-- **Structured pruning**: L1 unstructured pruning applied to linear layers, followed by quantization (CPU)
+---
 
-Hardware tested:
+## 2. Methodology
 
-- CPU-only inference (Google Colab, Intel Xeon @ 2.20GHz)
-- NVIDIA T4 GPU (Google Colab)
-- NVIDIA GTX 1050 Ti (local machine; CPU fallback to Intel Core i5-7500 @ 3.40GHz)
+- **Task:** SST-2 sentiment classification  
+- **Models:** DistilBERT (66M) and BERT-base (110M), fine-tuned  
+- **Compression Techniques:**
+  - 8-bit dynamic quantization (PyTorch, ONNX, bitsandbytes)
+  - 4-bit quantization (bitsandbytes QLoRA-style)
+  - L1 structured pruning (PyTorch)
+- **Evaluation Metrics:** Accuracy, per-sample latency (ms), RAM/VRAM usage (MB)
+- **Hardware Platforms:**
+  - Intel Xeon (Colab CPU)
+  - NVIDIA T4 (Colab GPU)
+  - NVIDIA GTX 1050 Ti + Intel Core i5-7500 (local)
 
-Each configuration was evaluated using:
+Each experiment reuses a consistent data loading and tokenization pipeline for fair comparison.
 
-- Accuracy (on the SST-2 validation set)
-- Latency per sample (in milliseconds)
-- Peak RAM usage (for CPU)
-- VRAM usage and memory deltas (for GPU)
+---
 
-All models used were loaded from Hugging Face's Transformers library. Quantization and pruning were applied post-training, and all evaluations were done without additional fine-tuning.
+## 3. Experiments and Results
 
-## Experiments
+### 3.1 DistilBERT on CPU (n1)
 
-The project consists of four experimental notebooks, each focused on a different hardware and compression configuration. All tests were performed on 100 validation samples from the SST-2 sentiment classification task.
+| Metric        | FP32      | INT8      | Δ (%)    |
+|---------------|-----------|-----------|----------|
+| Accuracy      | 91.06%    | 89.33%    | -1.73%   |
+| Latency (ms)  | 352.0     | 151.3     | -57%     |
+| RAM (MB)      | 273.00    | 5.81      | -98%     |
 
-### 1. CPU Inference (FP32 vs 8-bit)
+✅ 8-bit quantization drastically improves latency and RAM usage with minimal accuracy drop.
 
-- Environment: Google Colab (Intel Xeon @ 2.20GHz)
-- Tools: PyTorch dynamic quantization
-- 8-bit dynamic quantization reduced:
-  - Latency by ~57%
-  - Memory usage by ~98%
-- Accuracy dropped slightly (from 91.06% to 89.33%)
+---
 
-### 2. GPU Quantization on T4
+### 3.2 DistilBERT on CPU – Pruned + Quantized (n2)
 
-- Environment: Google Colab (NVIDIA T4 GPU)
-- Tools: bitsandbytes 8-bit and 4-bit quantization
-- Accuracy remained stable (94% FP32 and INT8, 93% for 4-bit)
-- Latency increased for 8-bit due to kernel overhead
-- 4-bit offered the best latency and lowest memory delta, but highest VRAM load
+| Pruning | Accuracy | Latency (s) | RAM (MB) |
+|---------|----------|-------------|----------|
+| 30%     | 90.48%   | 60          | 2330     |
+| 40%     | 88.87%   | 54          | 2500     |
+| 50%     | 87.16%   | 47.5        | 2697     |
 
-### 3. CPU Pruning + Quantization
+✅ Pruning reduces latency further.  
+⚠️ RAM usage increases due to PyTorch masking. No memory benefits without sparse-aware runtimes.
 
-- Environment: Google Colab (CPU only)
-- Applied 30%, 40%, and 50% L1 unstructured pruning followed by 8-bit quantization
-- Observed:
-  - Gradual accuracy drop (from 90.5% to 87.2%)
-  - Consistent latency improvement
-  - Increased RAM usage due to PyTorch overhead
-- Demonstrated pruning is effective for latency but not for memory reduction without sparse-aware backends
+---
 
-### 4. GPU Quantization on GTX 1050 Ti
+### 3.3 DistilBERT on T4 GPU (n3)
 
-- Environment: Local machine (GTX 1050 Ti + Intel Core i5-7500)
-- bitsandbytes models loaded, but likely fell back to CPU
-- Evidence:
-  - Higher latency for 8-bit and 4-bit compared to FP32
-  - Negative VRAM deltas during inference
-- Confirms that older GPUs without compute capability 7.5 are not suitable for quantized LLM inference
+| Precision | Accuracy | Latency (ms) | VRAM Total (MB) | VRAM Δ (MB) | RAM Δ (MB) |
+|-----------|----------|--------------|------------------|-------------|------------|
+| FP32      | 94.00%   | 12.40        | 659.88           | 30.00       | 213.52     |
+| 8-bit     | 94.00%   | 77.20        | 843.88           | 14.00       | 130.85     |
+| 4-bit     | 93.00%   | 16.50        | 953.88           | 2.00        | 5.73       |
 
-## Key Findings
+⚠️ 8-bit slower due to kernel overhead.  
+✅ 4-bit has lowest memory deltas but increases total VRAM.
 
-## Performance Summary Table
+---
 
-| Configuration               | Accuracy (%) | Latency (ms) | RAM ↑ (MB) | VRAM ↑ (MB) | Notes                             |
-|----------------------------|--------------|--------------|------------|-------------|-----------------------------------|
-| CPU FP32 (Colab)           | 91.06        | 352.0        | 273.00     | N/A         | Baseline                          |
-| CPU INT8 (Colab)           | 89.33        | 151.3        | 5.81       | N/A         | 98% RAM drop, ~57% faster         |
-| CPU Pruned+INT8 (30%)      | 90.48        | ~60,000      | 2330       | N/A         | Latency in full sweep, batch=16   |
-| CPU Pruned+INT8 (50%)      | 87.16        | ~47,500      | 2697       | N/A         | Lower latency, higher RAM         |
-| T4 FP32 (Colab)            | 94.00        | 12.4         | 213.52     | 30.00       | Fast and balanced                 |
-| T4 INT8                    | 94.00        | 77.2         | 130.85     | 14.00       | Higher latency due to overhead    |
-| T4 4-bit                   | 93.00        | 16.5         | 5.73       | 2.00        | Best latency + lowest RAM         |
-| GTX 1050 Ti FP32           | 94.00        | 9.15         | 97.40      | 20.13       | True GPU execution                |
-| GTX 1050 Ti INT8           | 94.00        | 98.44        | 48.71      | -12.38      | Likely CPU fallback               |
-| GTX 1050 Ti 4-bit          | 93.00        | 11.27        | -4.93      | -3.00       | Likely CPU fallback               |
+### 3.4 DistilBERT on GTX 1050 Ti (n4)
+
+| Precision | Accuracy | Latency (ms) | VRAM Δ (MB) | RAM Δ (MB) |
+|-----------|----------|--------------|-------------|------------|
+| FP32      | 94.00%   | 9.15         | +20.13      | 97.40      |
+| 8-bit     | 94.00%   | 98.44        | -12.38      | 48.71      |
+| 4-bit     | 93.00%   | 11.27        | -3.00       | -4.93      |
+
+⚠️ Quantized models fell back to CPU → higher latency, negative VRAM delta.
+
+---
+
+### 3.5 BERT-base on T4 GPU (n5)
+
+| Precision | Accuracy | Latency (ms) | VRAM Total (MB) | VRAM Δ (MB) | RAM Δ (MB) |
+|-----------|----------|--------------|------------------|-------------|------------|
+| FP32      | 92.00%   | 12.83        | 1289.88          | 32.00       | 63.26      |
+| 8-bit     | 92.00%   | 94.04        | 1081.88          | 12.00       | 20.96      |
+| 4-bit     | 92.00%   | 20.75        | 1195.88          | 6.00        | 0.51       |
+
+✅ All variants maintain accuracy.  
+✅ 4-bit offers best memory efficiency.  
+⚠️ 8-bit slower due to fused kernel overhead.
+
+---
+
+### 3.6 DistilBERT via ONNX Runtime (n6)
+
+| Precision | Accuracy | Inference Time (s) | RAM Δ (MB) |
+|-----------|----------|--------------------|------------|
+| FP32      | 91.06%   | 191.68             | ~0.00      |
+| INT8      | 90.48%   | 121.08             | ~0.00      |
+
+✅ ONNX quantization yields ~36.8% speedup with minimal accuracy loss.  
+⚠️ RAM unchanged due to measurement granularity.
+
+---
+
+## 4. Key Insights
+
+- **8-bit quantization is highly effective on CPUs** (speed + memory, minimal accuracy loss).
+- **Structured pruning reduces latency** but doesn't save RAM without sparse-aware inference engines.
+- **bitsandbytes 4-bit quantization** works best on larger models and modern GPUs.
+- **Quantized models on old GPUs (e.g., GTX 1050 Ti)** fall back to CPU — misleading gains.
+- **BERT benefits more from quantization than DistilBERT**, justifying compression for bigger models.
+- **ONNX Runtime** is a lightweight, portable option for CPU quantized inference.
+
+---
+
+## 5. How to Reproduce
+
+Run the following notebooks in order:
+
+| Notebook Filename                  | Description                              |
+|-----------------------------------|------------------------------------------|
+| `n1_dbert_quant_cpu.ipynb`        | DistilBERT CPU FP32 vs 8-bit             |
+| `n2_dbert_quant_prun_cpu.ipynb`   | DistilBERT CPU pruning + quantization    |
+| `n3_dbert_quant_gpu_t4.ipynb`     | DistilBERT on T4 (FP32, 8-bit, 4-bit)    |
+| `n4_dbert_quant_gpu_gtx.ipynb`    | DistilBERT on GTX 1050 Ti                |
+| `n5_bert_quant_gpu_t4.ipynb`      | BERT-base on T4 (FP32, 8-bit, 4-bit)     |
+| `n6_dbert_onnx_cpu.ipynb`         | DistilBERT with ONNX Runtime             |
+
+Each notebook is self-contained with metrics and visualizations.
+
+---
+
+## 6. References
+
+- Sanh, V. et al. (2019). [DistilBERT: A distilled version of BERT](https://arxiv.org/abs/1910.01108)  
+- Devlin, J. et al. (2019). [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805)  
+- Dettmers, T. et al. (2023). [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314)  
+- Han, S. et al. (2016). [Deep Compression: Compressing Deep Neural Networks with Pruning, Trained Quantization and Huffman Coding](https://arxiv.org/abs/1510.00149)  
+- ONNX Runtime. [Quantization Overview](https://onnxruntime.ai/docs/performance/quantization.html)
 
 
-- **8-bit quantization** is highly effective on CPU: it drastically reduces memory usage and inference time with only a small drop in accuracy.
-- On **T4 GPUs**, 8-bit and 4-bit quantization retain accuracy but may introduce latency overheads due to kernel fusion and runtime reordering.
-- **4-bit quantization** significantly lowers memory deltas but increases total VRAM footprint—suitable for large models but less beneficial for small models like DistilBERT.
-- **Structured pruning** improves latency but does not reduce memory unless combined with sparse-aware runtimes (e.g., ONNX Runtime or DeepSparse).
-- **Older GPUs (like GTX 1050 Ti)** may load quantized models but fall back to CPU for inference, negating performance gains.
-- Consistent data preprocessing across all notebooks ensured fair comparisons and reproducibility.
+---
 
-## Reproducing the Experiments
+## 7. Acknowledgements
 
-Each experiment is provided as a standalone Jupyter notebook:
+This project was conducted as part of the MSc Artificial Intelligence programme at the University of Hull.
 
-- `baseline_cpu.ipynb` – CPU FP32 vs 8-bit quantization
-- `quantization_gpu.ipynb` – T4 GPU quantization (FP32, 8-bit, 4-bit)
-- `pruning_cpu.ipynb` – CPU pruning + 8-bit quantization
-- `quantization_gtx1050ti.ipynb` – GTX 1050 Ti results
+Thanks to Hugging Face, PyTorch, bitsandbytes, and ONNX Runtime for making this work possible. SST-2 is part of the GLUE benchmark.
 
-Run each notebook sequentially. They include:
 
-- Environment setup and dependencies
-- Model and dataset loading
-- Inference and benchmarking
-- Result summaries with metrics and tables
-
-> Note: bitsandbytes 4-bit inference requires CUDA compute capability ≥7.5. On older GPUs (e.g., GTX 1050 Ti), fallback to CPU is likely.
-
-## Dependencies
-
-The notebooks rely on the following Python packages:
-
-- `transformers`
-- `datasets`
-- `torch`
-- `evaluate`
-- `psutil`
-- `bitsandbytes` (for 8-bit and 4-bit GPU quantization)
-- `accelerate`
-- `pynvml` (for GPU memory tracking)
-
-These can be installed via `pip`:
-
-```bash
-pip install transformers datasets torch evaluate psutil bitsandbytes accelerate pynvml
-```
-
-> Some packages (like `bitsandbytes`) require a compatible CUDA environment and are only supported on Linux-based systems with NVIDIA GPUs.
-
-## Acknowledgements
-
-This project was conducted as part of the MSc Artificial Intelligence programme at the University of Hull (online).
-
-Thanks to Hugging Face, PyTorch, and the open-source community for providing the tools used throughout this study.
-
-The SST-2 dataset is part of the GLUE benchmark and was accessed via the Hugging Face Datasets library.
