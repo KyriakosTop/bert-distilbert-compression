@@ -4,10 +4,10 @@
 Because most developers don't have access to high-end GPUs. Because deploying models to laptops, embedded devices, or free-tier cloud services is increasingly common. And because not every task needs a trillion-parameter model — but everyone still wants fast, accurate results.
 
 This project tackles a practical and relevant challenge:  
-**Can transformer-based models like DistilBERT or BERT-base be made efficient enough to run on CPUs or older GPUs — without retraining and without sacrificing too much accuracy?**
+**Can transformer-based models like DistilBERT or BERT-base be made efficient enough to run on CPUs or older GPUs — with post-training compression and/or light fine-tuning — without sacrificing too much accuracy?**
 
-To answer this, we apply **8-bit and 4-bit quantization** and **structured pruning** to fine-tuned transformer models and benchmark their performance on the SST-2 sentiment classification task across a range of hardware environments. The goal is simple:  
-**Make these models smaller, faster, and deployable — without compromising usefulness.**
+We apply **8-bit and 4-bit quantization**, **structured pruning**, and **parameter-efficient fine-tuning** (LoRA/QLoRA) to transformer models and benchmark their performance on **SST-2** across diverse hardware. The goal is simple:  
+**Make these models smaller, faster, and deployable — while keeping them useful.**
 
 ---
 
@@ -22,41 +22,46 @@ To answer this, we apply **8-bit and 4-bit quantization** and **structured pruni
    - [3.4 DistilBERT on GTX 1050 Ti (n4)](#34-distilbert-on-gtx-1050-ti-n4)  
    - [3.5 BERT-base on T4 GPU (n5)](#35-bert-base-on-t4-gpu-n5)  
    - [3.6 DistilBERT via ONNX Runtime (n6)](#36-distilbert-via-onnx-runtime-n6)  
+   - [3.7 DistilBERT + LoRA on T4 (n7)](#37-distilbert--lora-on-t4-n7)  
+   - [3.8 BERT-base FP32 vs QLoRA (4-bit) on T4 (n8)](#38-bert-base-fp32-vs-qlora-4-bit-on-t4-n8)  
 4. [Key Insights](#4-key-insights)  
 5. [How to Reproduce](#5-how-to-reproduce)  
-6. [Dependencies](#6-dependencies)  
-7. [References](#7-references)  
-8. [Acknowledgements](#8-acknowledgements)
+   - [5.1 Run order](#51-run-order)  
+   - [5.2 Environment notes](#52-environment-notes)  
+   - [5.3 Repro tips](#53-repro-tips)  
+6. [References](#6-references)  
+7. [Acknowledgements](#7-acknowledgements)
 
 ---
 
 ## 1. Motivation
 
-Transformer models are powerful — but deploying them on limited hardware remains a challenge. This project explores whether post-training compression techniques can make models like DistilBERT and BERT practical to run on:
+Transformer models are powerful — but deploying them on limited hardware remains a challenge. This project explores whether compression and PEFT techniques can make models like **DistilBERT** and **BERT-base** practical on:
 
 - Free-tier CPUs (e.g., Google Colab)
 - Consumer GPUs (e.g., GTX 1050 Ti)
 - Older edge or embedded systems
 
-We measure how much accuracy, latency, and memory can be traded off using 8-bit/4-bit quantization and structured pruning — without retraining the model.
+We measure accuracy, latency, and memory under quantization, pruning, and PEFT (LoRA/QLoRA).
 
 ---
 
 ## 2. Methodology
 
 - **Task:** SST-2 sentiment classification  
-- **Models:** DistilBERT (66M) and BERT-base (110M), fine-tuned  
-- **Compression Techniques:**
-  - 8-bit dynamic quantization (PyTorch, ONNX, bitsandbytes)
-  - 4-bit quantization (bitsandbytes QLoRA-style)
+- **Models:** DistilBERT (≈66M) and BERT-base (≈110M)  
+- **Techniques:**
+  - 8-bit dynamic quantization (PyTorch / bitsandbytes / ONNX)
+  - 4-bit quantization (bitsandbytes; QLoRA)
   - L1 structured pruning (PyTorch)
-- **Evaluation Metrics:** Accuracy, per-sample latency (ms), RAM/VRAM usage (MB)
-- **Hardware Platforms:**
+  - Parameter-Efficient Fine-Tuning: **LoRA** and **QLoRA**
+- **Metrics:** Accuracy, per-sample latency (ms), RAM/VRAM usage (MB)
+- **Hardware:**
   - Intel Xeon (Colab CPU)
   - NVIDIA T4 (Colab GPU)
   - NVIDIA GTX 1050 Ti + Intel Core i5-7500 (local)
 
-Each experiment reuses a consistent data loading and tokenization pipeline for fair comparison.
+All experiments share a consistent GLUE/SST-2 data pipeline for comparability.
 
 ---
 
@@ -78,12 +83,12 @@ Each experiment reuses a consistent data loading and tokenization pipeline for f
 
 | Pruning | Accuracy | Latency (s) | RAM (MB) |
 |---------|----------|-------------|----------|
-| 30%     | 90.48%   | 60          | 2330     |
-| 40%     | 88.87%   | 54          | 2500     |
+| 30%     | 90.48%   | 60.0        | 2330     |
+| 40%     | 88.87%   | 54.0        | 2500     |
 | 50%     | 87.16%   | 47.5        | 2697     |
 
-✅ Pruning reduces latency further.  
-⚠️ RAM usage increases due to PyTorch masking. No memory benefits without sparse-aware runtimes.
+✅ Pruning reduces latency.  
+⚠️ RAM increases in PyTorch due to masks; sparse-aware runtimes are needed to see memory wins.
 
 ---
 
@@ -96,7 +101,7 @@ Each experiment reuses a consistent data loading and tokenization pipeline for f
 | 4-bit     | 93.00%   | 16.50        | 953.88           | 2.00        | 5.73       |
 
 ⚠️ 8-bit slower due to kernel overhead.  
-✅ 4-bit has lowest memory deltas but increases total VRAM.
+✅ 4-bit cuts memory deltas most, with modest latency impact.
 
 ---
 
@@ -108,7 +113,7 @@ Each experiment reuses a consistent data loading and tokenization pipeline for f
 | 8-bit     | 94.00%   | 98.44        | -12.38      | 48.71      |
 | 4-bit     | 93.00%   | 11.27        | -3.00       | -4.93      |
 
-⚠️ Quantized models fell back to CPU → higher latency, negative VRAM delta.
+⚠️ Quantized models fell back to CPU on older GPU → higher latency, negative VRAM deltas.
 
 ---
 
@@ -120,9 +125,7 @@ Each experiment reuses a consistent data loading and tokenization pipeline for f
 | 8-bit     | 92.00%   | 94.04        | 1081.88          | 12.00       | 20.96      |
 | 4-bit     | 92.00%   | 20.75        | 1195.88          | 6.00        | 0.51       |
 
-✅ All variants maintain accuracy.  
-✅ 4-bit offers best memory efficiency.  
-⚠️ 8-bit slower due to fused kernel overhead.
+✅ All variants maintain accuracy; 4-bit provides the best memory efficiency on BERT.
 
 ---
 
@@ -133,47 +136,98 @@ Each experiment reuses a consistent data loading and tokenization pipeline for f
 | FP32      | 91.06%   | 191.68             | ~0.00      |
 | INT8      | 90.48%   | 121.08             | ~0.00      |
 
-✅ ONNX quantization yields ~36.8% speedup with minimal accuracy loss.  
-⚠️ RAM unchanged due to measurement granularity.
+✅ ONNX INT8 yields ~36.8% speedup with minimal accuracy loss.
+
+---
+
+### 3.7 DistilBERT + LoRA on T4 (n7)
+
+**Goal.** Compare **FP16 LoRA** (adapters on full-precision DistilBERT) vs **QLoRA** (4-bit base + LoRA) on SST-2 using a T4 GPU.
+
+| Precision / Method | Accuracy | Latency (ms) | VRAM Total (MB) | VRAM Δ (MB) | RAM Δ (MB) |
+|--------------------|----------|--------------|------------------|-------------|------------|
+| **LoRA (FP16)**    | **90.48%** | **10.52**   | **1021.88**      | ~0.00       | ~0.00      |
+| QLoRA (4-bit)      | —        | —            | —                | —           | —          |
+
+✅ FP16 LoRA trains and evaluates reliably on T4 with DistilBERT.  
+⚠️ QLoRA on DistilBERT is **not reliable** with current bitsandbytes 4-bit kernels (assertion during quantization state recovery); see **BERT-base** results below.
+
+---
+
+### 3.8 BERT-base FP32 vs QLoRA (4-bit) on T4 (n8)
+
+**Setup:** SST-2 `train[:20,000]`, 2 epochs, max length 128, T4 GPU.  
+(Training details and per-model reload evaluation are in the notebook.)
+
+| Precision | Accuracy | Latency (ms) | VRAM Total (MB) | VRAM Δ (MB) | RAM Δ (MB) |
+|-----------|----------|--------------|------------------|-------------|------------|
+| **FP32**  | **91.63%** | **7.60**    | **420.99**       | ~0.00       | ~0.00      |
+| **4-bit QLoRA** | **90.60%** | **3.25** | **99.00**       | ~0.00       | ~0.00      |
+
+✅ **QLoRA** nearly matches FP32 accuracy while being faster and far lighter in VRAM on T4.  
+(Notebook also reports training wall time and peak VRAM; inference table here matches the style of 3.1–3.6.)
 
 ---
 
 ## 4. Key Insights
 
-- **8-bit quantization is highly effective on CPUs** (speed + memory, minimal accuracy loss).
-- **Structured pruning reduces latency** but doesn't save RAM without sparse-aware inference engines.
-- **bitsandbytes 4-bit quantization** works best on larger models and modern GPUs.
-- **Quantized models on old GPUs (e.g., GTX 1050 Ti)** fall back to CPU — misleading gains.
-- **BERT benefits more from quantization than DistilBERT**, justifying compression for bigger models.
-- **ONNX Runtime** is a lightweight, portable option for CPU quantized inference.
+- **8-bit quantization is highly effective on CPUs** (large latency & RAM cuts, small accuracy hit).
+- **Structured pruning** reduces latency but **doesn’t save RAM** in PyTorch without sparse-aware runtimes.
+- **bitsandbytes 4-bit** helps most on **larger models and modern GPUs** (e.g., BERT-base on T4).
+- On **older GPUs**, quantized models may **fall back to CPU** — always check device placement.
+- **LoRA/QLoRA**: with tuned adapters (higher LR, sensible target modules), you get **near-FP32 accuracy** with **~0.5% trainable params** and much lower VRAM.
+- For **fair VRAM comparisons**, measure with **per-model reload** so only one checkpoint sits on the GPU at a time.
+- **DistilBERT + QLoRA** is currently **unreliable/fails** with some bitsandbytes 4-bit kernels; use **BERT-base** for QLoRA (n8).
 
 ---
 
 ## 5. How to Reproduce
 
-Run the following notebooks in order:
+> Tip: run notebooks in order. Each is self-contained and will download SST-2 automatically from 🤗 Datasets.
 
-| Notebook Filename                  | Description                              |
-|-----------------------------------|------------------------------------------|
-| `n1_dbert_quant_cpu.ipynb`        | DistilBERT CPU FP32 vs 8-bit             |
-| `n2_dbert_quant_prun_cpu.ipynb`   | DistilBERT CPU pruning + quantization    |
-| `n3_dbert_quant_gpu_t4.ipynb`     | DistilBERT on T4 (FP32, 8-bit, 4-bit)    |
-| `n4_dbert_quant_gpu_gtx.ipynb`    | DistilBERT on GTX 1050 Ti                |
-| `n5_bert_quant_gpu_t4.ipynb`      | BERT-base on T4 (FP32, 8-bit, 4-bit)     |
-| `n6_dbert_onnx_cpu.ipynb`         | DistilBERT with ONNX Runtime             |
+### 5.1 Run order
 
-Each notebook is self-contained with metrics and visualizations.
+| Notebook Filename                | What it does                                             |
+|----------------------------------|----------------------------------------------------------|
+| `n1_dbert_quant_cpu.ipynb`       | DistilBERT on CPU: FP32 vs dynamic INT8                  |
+| `n2_dbert_quant_prun_cpu.ipynb`  | DistilBERT on CPU: L1 structured pruning + quantization  |
+| `n3_dbert_quant_gpu_t4.ipynb`    | DistilBERT on T4: FP32 / 8-bit / 4-bit                   |
+| `n4_dbert_quant_gpu_gtx.ipynb`   | DistilBERT on GTX 1050 Ti (older GPU quirks)             |
+| `n5_bert_quant_gpu_t4.ipynb`     | BERT-base on T4: FP32 / 8-bit / 4-bit                    |
+| `n6_dbert_onnx_cpu.ipynb`        | DistilBERT via ONNX Runtime: FP32 vs INT8                |
+| `n7_dbert_lora_gpu_t4.ipynb`     | DistilBERT on T4: **LoRA (FP16)** and **QLoRA attempt**  |
+| `n8_bert_qlora_gpu_t4.ipynb`     | BERT-base on T4: **FP32 vs QLoRA (4-bit)**               |
+
+### 5.2 Environment notes
+
+- **Python:** 3.10+  
+- **PyTorch:** 2.1+ (CUDA build if using GPU)  
+- **GPU:** NVIDIA T4 (Colab) for n3, n5, n7, n8; GTX 1050 Ti for n4  
+- **Dataset:** `glue/sst2` is pulled on first run
+
+### 5.3 Repro tips
+
+- All training notebooks set `SEED = 42`. For exact reproducibility, keep batch sizes/epochs the same and avoid interrupting the runtime.  
+- For **T4 runs**, ensure the Colab runtime is set to **GPU**.  
+- On **older GPUs** (e.g., 1050 Ti), quantized models may **fallback to CPU**; verify with `next(model.parameters()).device`.  
+- QLoRA on **DistilBERT** (n7) can fail due to bitsandbytes 4-bit kernel shape checks; use **BERT-base** (n8) for QLoRA results.
 
 ---
 
 ## 6. References
 
-- Sanh, V. et al. (2019). [DistilBERT: A distilled version of BERT](https://arxiv.org/abs/1910.01108)  
-- Devlin, J. et al. (2019). [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/abs/1810.04805)  
-- Dettmers, T. et al. (2023). [QLoRA: Efficient Finetuning of Quantized LLMs](https://arxiv.org/abs/2305.14314)  
-- Han, S. et al. (2016). [Deep Compression: Compressing Deep Neural Networks with Pruning, Trained Quantization and Huffman Coding](https://arxiv.org/abs/1510.00149)  
-- ONNX Runtime. [Quantization Overview](https://onnxruntime.ai/docs/performance/quantization.html)
-
+- Sanh, V., Debut, L., Chaumond, J., & Wolf, T. (2019). *DistilBERT: A distilled version of BERT.* arXiv:1910.01108. https://arxiv.org/abs/1910.01108  
+- Devlin, J., Chang, M.-W., Lee, K., & Toutanova, K. (2019). *BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding.* arXiv:1810.04805. https://arxiv.org/abs/1810.04805  
+- Hu, E. J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, L., Wang, L., & Chen, W. (2021). *LoRA: Low-Rank Adaptation of Large Language Models.* arXiv:2106.09685. https://arxiv.org/abs/2106.09685  
+- Dettmers, T., Pagnoni, A., Holtzman, A., & Zettlemoyer, L. (2023). *QLoRA: Efficient Finetuning of Quantized LLMs.* arXiv:2305.14314. https://arxiv.org/abs/2305.14314  
+- Han, S., Mao, H., & Dally, W. J. (2016). *Deep Compression: Compressing Deep Neural Networks with Pruning, Trained Quantization and Huffman Coding.* ICLR. https://arxiv.org/abs/1510.00149  
+- Wang, A., Singh, A., Michael, J., Hill, F., Levy, O., & Bowman, S. R. (2018). *GLUE: A Multi-Task Benchmark and Analysis Platform for Natural Language Understanding.* arXiv:1804.07461. https://arxiv.org/abs/1804.07461  
+- Socher, R., Perelygin, A., Wu, J., Chuang, J., Manning, C. D., Ng, A., & Potts, C. (2013). *Recursive Deep Models for Semantic Compositionality Over a Sentiment Treebank (SST).* EMNLP. https://aclanthology.org/D13-1170/  
+- Wolf, T., Debut, L., Sanh, V., Chaumond, J., Delangue, C., Moi, A., et al. (2020). *Transformers: State-of-the-Art Natural Language Processing.* EMNLP (System Demos). https://arxiv.org/abs/1910.03771  
+- Lhoest, Q., Delangue, C., von Platen, P., et al. (2021). *Datasets: A Community Library for Natural Language Processing.* NeurIPS (Datasets and Benchmarks). https://arxiv.org/abs/2109.02846  
+- Hugging Face PEFT. *Parameter-Efficient Fine-Tuning library.* https://github.com/huggingface/peft  
+- bitsandbytes. *8-bit/4-bit quantization and optimizers.* https://github.com/TimDettmers/bitsandbytes  
+- ONNX Runtime Docs. *Quantization Overview.* https://onnxruntime.ai/docs/performance/quantization.html
 
 ---
 
@@ -182,5 +236,3 @@ Each notebook is self-contained with metrics and visualizations.
 This project was conducted as part of the MSc Artificial Intelligence programme at the University of Hull.
 
 Thanks to Hugging Face, PyTorch, bitsandbytes, and ONNX Runtime for making this work possible. SST-2 is part of the GLUE benchmark.
-
-
