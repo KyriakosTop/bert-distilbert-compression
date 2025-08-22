@@ -69,13 +69,14 @@ All experiments share a consistent GLUE/SST-2 data pipeline for comparability.
 
 ### 3.1 DistilBERT on CPU (n1)
 
-| Metric        | FP32      | INT8      | Δ (%)    |
-|---------------|-----------|-----------|----------|
-| Accuracy      | 91.06%    | 89.33%    | -1.73%   |
-| Latency (ms)  | 352.0     | 151.3     | -57%     |
-| RAM (MB)      | 273.00    | 5.81      | -98%     |
+| Metric        | FP32   | INT8   | Δ (%)  |
+|---------------|--------|--------|--------|
+| Accuracy      | 91.06% | 89.33% | -1.73% |
+| Latency (s)   | 0.3520 | 0.1513 | -57%   |
+| RAM (MB)      | 273.00 | 5.81   | -98%   |
 
-✅ 8-bit quantization drastically improves latency and RAM usage with minimal accuracy drop.
+✅ 8-bit quantization drastically improves latency and RAM usage with minimal accuracy drop.  
+⚠️ 4-bit quantization is not supported on CPU (PyTorch only provides 8-bit dynamic quantization).
 
 ---
 
