@@ -55,7 +55,10 @@ We measure accuracy, latency, and memory under quantization, pruning, and PEFT (
   - 4-bit quantization (bitsandbytes; QLoRA)
   - L1 structured pruning (PyTorch)
   - Parameter-Efficient Fine-Tuning: **LoRA** and **QLoRA**
-- **Metrics:** Accuracy, per-sample latency (ms), RAM/VRAM usage (MB)
+- **Metrics:** Accuracy, per-sample latency (ms), RAM/VRAM usage (MB).  
+👉 Note: RAM/VRAM usage is reported as **ΔRSS = memory at end − memory at start** of evaluation.  
+This captures *retained memory*, not peak usage. It is consistent across experiments, but can produce counterintuitive values (e.g. INT8 showing very low RAM deltas, or negative VRAM deltas on unsupported GPUs). Peak memory was not the focus here; the chosen metric emphasizes **relative differences** between techniques under the same conditions.
+
 - **Hardware:**
   - Intel Xeon (Colab CPU)
   - NVIDIA T4 (Colab GPU)
