@@ -51,13 +51,15 @@ We measure accuracy, latency, and memory under quantization, pruning, and PEFT (
 - **Task:** SST-2 sentiment classification  
 - **Models:** DistilBERT (≈66M) and BERT-base (≈110M)  
 - **Techniques:**
-  - 8-bit dynamic quantization (PyTorch / bitsandbytes / ONNX)
-  - 4-bit quantization (bitsandbytes; QLoRA)
-  - L1 unstructured pruning (PyTorch)
-  - Parameter-Efficient Fine-Tuning: **LoRA** and **QLoRA**
-- **Metrics:** Accuracy, per-sample latency (ms), RAM/VRAM usage (MB).  
-👉 Note: RAM/VRAM usage is reported as **ΔRSS = memory at end − memory at start** of evaluation.  
-This captures *retained memory*, not peak usage. It is consistent across experiments, but can produce counterintuitive values (e.g. INT8 showing very low RAM deltas, or negative VRAM deltas on unsupported GPUs). Peak memory was not the focus here; the chosen metric emphasizes **relative differences** between techniques under the same conditions.
+  - **8-bit quantization:** PyTorch dynamic INT8 on CPU; bitsandbytes INT8 on GPU; ONNX Runtime INT8
+  - **4-bit quantization:** bitsandbytes (inference) and **QLoRA** (4-bit base + LoRA adapters for training)
+  - **L1 unstructured pruning** (PyTorch on `nn.Linear`)
+  - **PEFT:** **LoRA** and **QLoRA**
+- **Metrics:** Accuracy; latency (CPU: seconds or total seconds, GPU: ms/sample); memory:
+  - **RAM Δ (MB)** and **VRAM Δ (MB)** = end of evaluation − start of evaluation (retained, not peak)
+  - **VRAM Total (MB)** = GPU memory right after model load (pre-inference footprint)
+  - **n2** reports **RAM (MB, total RSS at end)** and **Total Latency (s)** for the full validation set  
+  *Note:* Δ metrics can look counter-intuitive (e.g., very small RAM deltas or negative VRAM deltas on unsupported GPUs due to CPU fallback). Each results table labels columns explicitly as **Δ** or **Total**.
 
 - **Hardware:**
   - Intel Xeon (Colab CPU)
