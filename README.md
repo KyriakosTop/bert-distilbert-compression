@@ -6,7 +6,7 @@ Because most developers don't have access to high-end GPUs. Because deploying mo
 This project tackles a practical and relevant challenge:  
 **Can transformer-based models like DistilBERT or BERT-base be made efficient enough to run on CPUs or older GPUs — with post-training compression and/or light fine-tuning — without sacrificing too much accuracy?**
 
-We apply **8-bit and 4-bit quantization**, **structured pruning**, and **parameter-efficient fine-tuning** (LoRA/QLoRA) to transformer models and benchmark their performance on **SST-2** across diverse hardware. The goal is simple:  
+We apply **8-bit and 4-bit quantization**, **L1 unstructured pruning**, and **parameter-efficient fine-tuning** (LoRA/QLoRA) to transformer models and benchmark their performance on **SST-2** across diverse hardware. The goal is simple:  
 **Make these models smaller, faster, and deployable — while keeping them useful.**
 
 ---
