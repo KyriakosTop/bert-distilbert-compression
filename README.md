@@ -53,7 +53,7 @@ We measure accuracy, latency, and memory under quantization, pruning, and PEFT (
 - **Techniques:**
   - 8-bit dynamic quantization (PyTorch / bitsandbytes / ONNX)
   - 4-bit quantization (bitsandbytes; QLoRA)
-  - L1 structured pruning (PyTorch)
+  - L1 unstructured pruning (PyTorch)
   - Parameter-Efficient Fine-Tuning: **LoRA** and **QLoRA**
 - **Metrics:** Accuracy, per-sample latency (ms), RAM/VRAM usage (MB).  
 👉 Note: RAM/VRAM usage is reported as **ΔRSS = memory at end − memory at start** of evaluation.  
@@ -176,7 +176,7 @@ All experiments share a consistent GLUE/SST-2 data pipeline for comparability.
 ## 4. Key Insights
 
 - **8-bit quantization is highly effective on CPUs** (large latency & RAM cuts, small accuracy hit).
-- **Structured pruning** reduces latency but **doesn’t save RAM** in PyTorch without sparse-aware runtimes.
+- **Unstructured L1 pruning** reduces latency but **doesn’t save RAM** in PyTorch without sparse-aware runtimes.
 - **bitsandbytes 4-bit** helps most on **larger models and modern GPUs** (e.g., BERT-base on T4).
 - On **older GPUs**, quantized models may **fall back to CPU** — always check device placement.
 - **LoRA/QLoRA**: with tuned adapters (higher LR, sensible target modules), you get **near-FP32 accuracy** with **~0.5% trainable params** and much lower VRAM.
@@ -194,7 +194,7 @@ All experiments share a consistent GLUE/SST-2 data pipeline for comparability.
 | Notebook Filename                | What it does                                             |
 |----------------------------------|----------------------------------------------------------|
 | `n1_dbert_quant_cpu.ipynb`       | DistilBERT on CPU: FP32 vs dynamic INT8                  |
-| `n2_dbert_quant_prun_cpu.ipynb`  | DistilBERT on CPU: L1 structured pruning + quantization  |
+| `n2_dbert_quant_prun_cpu.ipynb`  | DistilBERT on CPU: L1 unstructured pruning + quantization|
 | `n3_dbert_quant_gpu_t4.ipynb`    | DistilBERT on T4: FP32 / 8-bit / 4-bit                   |
 | `n4_dbert_quant_gpu_gtx.ipynb`   | DistilBERT on GTX 1050 Ti (older GPU quirks)             |
 | `n5_bert_quant_gpu_t4.ipynb`     | BERT-base on T4: FP32 / 8-bit / 4-bit                    |
