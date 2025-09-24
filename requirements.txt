@@ -1,0 +1,20 @@
+# --- Core (models, tokenization, datasets) ---
+torch
+transformers
+datasets
+accelerate
+
+# --- PEFT (LoRA / QLoRA) ---
+peft
+
+# --- Quantization / ONNX path (CPU + export) ---
+onnx
+onnxruntime
+
+# --- GPU low-bit kernels (T4 etc). If this line errors on Windows/CPU-only, delete it. ---
+bitsandbytes
+
+# --- Utilities used in notebooks (timing, memory, loops) ---
+psutil
+tqdm
+numpy
